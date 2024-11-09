@@ -5,6 +5,12 @@ import Set
 
 controlBarHeight = 64
 
+maxVisibleHistory = 2000
+
+-- Converts an index in the history list to an x coordinate on the screen
+historyIndexToX computer index =
+  (toFloat index) / maxVisibleHistory * computer.screen.width
+
 addTimeTravel rawGame = 
     { initialState = initialStateWithTimeTravel rawGame
     , updateState =updateWithTimeTravel rawGame
@@ -14,10 +20,21 @@ addTimeTravel rawGame =
 initialStateWithTimeTravel rawGame = 
     { rawModel = rawGame.initialState
     , paused = False
+    , history = []
     }
 
 viewWithTimeTravel rawGame computer model = 
     let
+        -- Creates a rectangle at the top of the screen, stretching from the
+        -- left edge up to a specific position within the history timeline
+        historyBar color opacity index =
+            let
+                width = historyIndexToX computer index
+            in
+                rectangle color width controlBarHeight  
+                    |> move (computer.screen.left + width / 2)
+                            (computer.screen.top - controlBarHeight / 2)
+                    |> fade opacity
         helpMessage =
             if model.paused then
             "Press R to resume"
@@ -27,6 +44,8 @@ viewWithTimeTravel rawGame computer model =
         (rawGame.view computer model.rawModel) ++
             [ words white helpMessage
                 |> move 0 (computer.screen.top - controlBarHeight / 2)
+            , historyBar (rgb 0 0 0) 0.3 maxVisibleHistory
+            , historyBar (rgb 64 224 208) 0.6 (List.length model.history)
             ]
 
 updateWithTimeTravel rawGame computer model = 
@@ -37,7 +56,10 @@ updateWithTimeTravel rawGame computer model =
     else if model.paused then
         model
     else
-        { model | rawModel = rawGame.updateState computer model.rawModel }
+        { model 
+            | rawModel = rawGame.updateState computer model.rawModel 
+            , history = model.history ++ [computer]
+        }
 
 keyPressed keyName computer =
   [ String.toLower keyName
